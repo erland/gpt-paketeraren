@@ -1,0 +1,6 @@
+schema_version: 1
+
+gpt:
+  id: gpt-paketeraren
+  name: GPT Paketeraren
+  description: Paketerar en användarskriven GPT-instruktion och Knowledge-filer för flera runtime-miljöer.

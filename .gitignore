@@ -1,6 +1,10 @@
 # Generated build output
 dist/
 build/
+web/dist/
+
+# Dependencies
+web/node_modules/
 
 # Python caches
 __pycache__/

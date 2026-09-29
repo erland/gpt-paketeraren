@@ -5,24 +5,18 @@ import { buildOpenCodeZip } from "./distributions/opencode";
 import { buildPluginZip } from "./distributions/plugin";
 import { downloadBlob } from "./download/download";
 import { importRuntimeZip } from "./import/importZip";
+import { isTextFile } from "./import/packageViewer";
+import { PackageFile, PackageMetadata } from "./domain/package";
 import { GptProject, KnowledgeFile, toProjectId, validateProject } from "./domain/project";
 import "./styles.css";
 
 type Runtime = "chat" | "plugin" | "claude" | "opencode";
+type ViewMode = "editable" | "readonly";
 
 const builders: Record<Runtime, (project: GptProject) => Promise<Blob>> = {
-  chat: buildChatZip,
-  plugin: buildPluginZip,
-  claude: buildClaudeZip,
-  opencode: buildOpenCodeZip
+  chat: buildChatZip, plugin: buildPluginZip, claude: buildClaudeZip, opencode: buildOpenCodeZip
 };
-
-const labels: Record<Runtime, string> = {
-  chat: "Chat",
-  plugin: "ChatGPT Plugin",
-  claude: "Claude",
-  opencode: "OpenCode"
-};
+const labels: Record<Runtime, string> = { chat: "Chat", plugin: "ChatGPT Plugin", claude: "Claude", opencode: "OpenCode" };
 
 export default function App() {
   const [name, setName] = useState("");
@@ -32,58 +26,74 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<Runtime | null>(null);
   const [importing, setImporting] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("editable");
+  const [packageFiles, setPackageFiles] = useState<PackageFile[]>([]);
+  const [packageMetadata, setPackageMetadata] = useState<PackageMetadata | null>(null);
+  const [preview, setPreview] = useState<{ title: string; content: string } | null>(null);
 
-  const project: GptProject = useMemo(
-    () => ({ name, description, instructions, knowledge }),
-    [name, description, instructions, knowledge]
-  );
-
+  const project: GptProject = useMemo(() => ({ name, description, instructions, knowledge }), [name, description, instructions, knowledge]);
   const errors = validateProject(project);
+  const readOnly = viewMode === "readonly";
 
   function addKnowledge(event: ChangeEvent<HTMLInputElement>) {
+    if (readOnly) return;
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
-
-    setKnowledge((current) => [
-      ...current,
-      ...files.map((file) => ({ path: file.name, content: file, size: file.size }))
-    ]);
+    setKnowledge((current) => [...current, ...files.map((file) => ({ path: file.name, content: file, size: file.size }))]);
     event.target.value = "";
   }
 
   function removeKnowledge(index: number) {
-    setKnowledge((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    if (!readOnly) setKnowledge((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
   async function importZip(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-
-    setImporting(true);
-    setMessage("");
+    setImporting(true); setMessage(""); setPreview(null);
     try {
       const imported = await importRuntimeZip(file);
-      setName(imported.project.name);
-      setDescription(imported.project.description);
-      setInstructions(imported.project.instructions);
-      setKnowledge(imported.project.knowledge);
-      setMessage(`Importerade ${labels[imported.runtime]}-distributionen.`);
+      setViewMode(imported.mode);
+      setPackageFiles(imported.files);
+      setPackageMetadata(imported.metadata);
+      if (imported.mode === "readonly") {
+        const instruction = imported.metadata.instructionPath
+          ? imported.files.find((item) => item.path === imported.metadata.instructionPath)?.textContent ?? ""
+          : "";
+        setName(imported.metadata.name);
+        setDescription(formatPackageDescription(imported.metadata));
+        setInstructions(instruction);
+        setKnowledge([]);
+        setMessage("Importerade GPT Byggaren-distributionen i read-only-läge.");
+      } else if (imported.project) {
+        setName(imported.project.name);
+        setDescription(imported.project.description);
+        setInstructions(imported.project.instructions);
+        setKnowledge(imported.project.knowledge);
+        const runtime = imported.runtime as Runtime;
+        setMessage(`Importerade ${labels[runtime]}-distributionen.`);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Kunde inte importera ZIP-filen.");
-    } finally {
-      setImporting(false);
-    }
+    } finally { setImporting(false); }
+  }
+
+  async function openKnowledge(item: KnowledgeFile) {
+    if (!isTextFile(item.path)) { setMessage("Den här filtypen kan inte förhandsvisas som text."); return; }
+    setPreview({ title: item.path, content: await item.content.text() });
+  }
+
+  function openPackageFile(item: PackageFile) {
+    if (item.textContent === undefined) { setMessage("Den här filtypen kan inte förhandsvisas som text."); return; }
+    setPreview({ title: item.path, content: item.textContent });
   }
 
   async function downloadRuntime(runtime: Runtime) {
+    if (readOnly) return;
     setMessage("");
     const validationErrors = validateProject(project);
-    if (validationErrors.length > 0) {
-      setMessage(validationErrors[0]);
-      return;
-    }
-
+    if (validationErrors.length > 0) { setMessage(validationErrors[0]); return; }
     setBusy(runtime);
     try {
       const zip = await builders[runtime](project);
@@ -91,9 +101,7 @@ export default function App() {
       setMessage(`${labels[runtime]} ZIP skapades lokalt i webbläsaren.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `Kunde inte skapa ${labels[runtime]} ZIP.`);
-    } finally {
-      setBusy(null);
-    }
+    } finally { setBusy(null); }
   }
 
   const totalKnowledgeSize = knowledge.reduce((sum, item) => sum + item.size, 0);
@@ -103,100 +111,75 @@ export default function App() {
     <main className="page">
       <section className="hero">
         <p className="eyebrow">GPT Paketeraren</p>
-        <h1>Skapa GPT-distributioner i webbläsaren</h1>
-        <p>
-          Innehållet stannar på din enhet. Instruktionen används som du skriver den och
-          skickas inte till någon server.
-        </p>
+        <h1>Skapa och visa GPT-distributioner i webbläsaren</h1>
+        <p>Innehållet stannar på din enhet. Vanliga GPT Paketeraren-distributioner kan redigeras; avancerade GPT Byggaren-paket visas read-only.</p>
       </section>
 
       <section className="card import-card">
-        <div>
-          <h2>Öppna befintlig GPT ZIP</h2>
-          <p>Importera en tidigare Chat-, ChatGPT Plugin-, Claude- eller OpenCode-distribution.</p>
-        </div>
-        <label className="file-button">
-          {importing ? "Öppnar…" : "Öppna GPT ZIP"}
-          <input type="file" accept=".zip,application/zip" onChange={importZip} disabled={importing} />
-        </label>
+        <div><h2>Öppna befintlig GPT ZIP</h2><p>Importera GPT Paketeraren- eller GPT Byggaren-distributioner.</p></div>
+        <label className="file-button">{importing ? "Öppnar…" : "Öppna GPT ZIP"}<input type="file" accept=".zip,application/zip" onChange={importZip} disabled={importing} /></label>
       </section>
 
+      {readOnly && (
+        <section className="card readonly-banner">
+          <div><strong>Read only</strong><p>Detta är en avancerad GPT-distribution. Innehållet kan visas men inte ändras eller konverteras.</p></div>
+          <div className="package-meta">{packageMetadata?.version && <span>Version {packageMetadata.version}</span>}{packageMetadata?.format && <span>{packageMetadata.format}</span>}</div>
+        </section>
+      )}
+
       <section className="card form-grid" aria-label="GPT-projekt">
-        <label>
-          <span>Namn på GPT</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Produktinformatören" />
-        </label>
+        <label><span>Namn på GPT</span><input value={name} readOnly={readOnly} onChange={(event) => setName(event.target.value)} placeholder="Produktinformatören" /></label>
+        <label><span>Kort beskrivning</span><input value={description} readOnly={readOnly} onChange={(event) => setDescription(event.target.value)} placeholder="Visar information om en produkt." /></label>
+        <label className="full"><span>GPT-instruktion</span><textarea rows={14} value={instructions} readOnly={readOnly} onChange={(event) => setInstructions(event.target.value)} placeholder="Skriv eller klistra in instruktionen här." /><small>{readOnly ? `Visas från ${packageMetadata?.instructionPath ?? "identifierad instruction-fil"}.` : "Instruktionen skrivs inte om eller förbättras av PWA:n."}</small></label>
 
-        <label>
-          <span>Kort beskrivning</span>
-          <input
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Visar information om en produkt."
-          />
-        </label>
-
-        <label className="full">
-          <span>GPT-instruktion</span>
-          <textarea
-            rows={14}
-            value={instructions}
-            onChange={(event) => setInstructions(event.target.value)}
-            placeholder="Skriv eller klistra in instruktionen här."
-          />
-          <small>Instruktionen skrivs inte om eller förbättras av PWA:n.</small>
-        </label>
-
-        <div className="full">
-          <div className="section-heading">
-            <div>
-              <h2>Knowledge-filer</h2>
-              <p>Valfria filer som följer med distributionerna.</p>
-            </div>
-            <label className="file-button">
-              Lägg till filer
-              <input type="file" multiple onChange={addKnowledge} />
-            </label>
+        {!readOnly && (
+          <div className="full">
+            <div className="section-heading"><div><h2>Knowledge-filer</h2><p>Klicka på en textfil för att visa innehållet.</p></div><label className="file-button">Lägg till filer<input type="file" multiple onChange={addKnowledge} /></label></div>
+            {knowledge.length === 0 ? <p className="empty">Inga Knowledge-filer valda.</p> : (
+              <ul className="files">{knowledge.map((item, index) => (
+                <li key={`${item.path}-${index}`}><button className="file-link" type="button" onClick={() => openKnowledge(item)}>{item.path}</button><button type="button" onClick={() => removeKnowledge(index)}>Ta bort</button></li>
+              ))}</ul>
+            )}
+            <small>{knowledge.length} filer · {formatBytes(totalKnowledgeSize)}</small>
           </div>
+        )}
 
-          {knowledge.length === 0 ? (
-            <p className="empty">Inga Knowledge-filer valda.</p>
-          ) : (
-            <ul className="files">
-              {knowledge.map((item, index) => (
-                <li key={`${item.path}-${index}`}>
-                  <span>{item.path}</span>
-                  <button type="button" onClick={() => removeKnowledge(index)}>Ta bort</button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <small>{knowledge.length} filer · {formatBytes(totalKnowledgeSize)}</small>
-        </div>
+        {readOnly && (
+          <div className="full">
+            <div className="section-heading"><div><h2>Paketfiler</h2><p>Klicka på textfiler för att visa dem. Binära filer listas men öppnas inte.</p></div></div>
+            <ul className="files package-files">{packageFiles.map((item) => (
+              <li key={item.path}><button className="file-link" type="button" disabled={item.textContent === undefined} onClick={() => openPackageFile(item)}>{item.path}</button><span>{formatBytes(item.size)}</span></li>
+            ))}</ul>
+            <small>{packageFiles.length} filer</small>
+          </div>
+        )}
       </section>
 
       <section className="card">
-        <div className="download-heading">
-          <h2>Hämta distribution</h2>
-          <p>Varje ZIP skapas först när du klickar på motsvarande knapp.</p>
-        </div>
-        <div className="download-grid">
-          {runtimes.map((runtime) => (
-            <button
-              key={runtime}
-              className="primary"
-              type="button"
-              onClick={() => downloadRuntime(runtime)}
-              disabled={errors.length > 0 || busy !== null || importing}
-            >
-              {busy === runtime ? "Skapar…" : `Hämta ${labels[runtime]} ZIP`}
-            </button>
-          ))}
-        </div>
+        <div className="download-heading"><h2>Hämta distribution</h2><p>{readOnly ? "Distributioner kan inte skapas från ett read-only-paket." : "Varje ZIP skapas först när du klickar på motsvarande knapp."}</p></div>
+        <div className="download-grid">{runtimes.map((runtime) => (
+          <button key={runtime} className="primary" type="button" onClick={() => downloadRuntime(runtime)} disabled={readOnly || errors.length > 0 || busy !== null || importing}>{busy === runtime ? "Skapar…" : `Hämta ${labels[runtime]} ZIP`}</button>
+        ))}</div>
         {message && <p className="status" role="status">{message}</p>}
       </section>
+
+      {preview && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setPreview(null)}>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="preview-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header><h2 id="preview-title">{preview.title}</h2><button className="modal-close" type="button" onClick={() => setPreview(null)} aria-label="Stäng">×</button></header>
+            <pre>{preview.content}</pre>
+          </section>
+        </div>
+      )}
     </main>
   );
+}
+
+function formatPackageDescription(metadata: PackageMetadata): string {
+  const parts = ["GPT Byggaren-distribution"];
+  if (metadata.format) parts.push(metadata.format);
+  if (metadata.version) parts.push(`version ${metadata.version}`);
+  return parts.join(" · ");
 }
 
 function formatBytes(bytes: number): string {

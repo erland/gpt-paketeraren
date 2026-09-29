@@ -1,19 +1,35 @@
 import JSZip from "jszip";
 import { GptProject, KnowledgeFile } from "../domain/project";
+import { PackageFile, PackageMetadata } from "../domain/package";
+import { detectPackageMetadata, isAdvancedPackage, readPackageFiles } from "./packageViewer";
 
 const ADAPTER_BEGIN = "<!-- GPT-PACKAGER:RUNTIME-ADAPTER:BEGIN -->";
 const ADAPTER_END = "<!-- GPT-PACKAGER:RUNTIME-ADAPTER:END -->";
 
-export type ImportedRuntime = "chat" | "plugin" | "claude" | "opencode";
+export type ImportedRuntime = "chat" | "plugin" | "claude" | "opencode" | "package";
 
 export interface ImportResult {
   runtime: ImportedRuntime;
-  project: GptProject;
+  mode: "editable" | "readonly";
+  project?: GptProject;
+  metadata: PackageMetadata;
+  files: PackageFile[];
 }
 
 export async function importRuntimeZip(file: Blob): Promise<ImportResult> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const names = Object.keys(zip.files);
+  const files = await readPackageFiles(zip);
+
+  if (isAdvancedPackage(zip)) {
+    const metadata = await detectPackageMetadata(zip, files);
+    return {
+      runtime: "package",
+      mode: "readonly",
+      metadata,
+      files
+    };
+  }
 
   if (zip.file("assistant/instructions.md") && zip.file("START-HERE.md")) {
     return importChat(zip);
@@ -40,9 +56,13 @@ async function importChat(zip: JSZip): Promise<ImportResult> {
   const [name, description] = parseTitleAndDescription(start);
   const knowledge = await collectKnowledge(zip, "knowledge/");
 
+  const project = { name, description, instructions, knowledge };
   return {
     runtime: "chat",
-    project: { name, description, instructions, knowledge }
+    mode: "editable",
+    project,
+    metadata: { name, format: "chat", instructionPath: "assistant/instructions.md" },
+    files: await readPackageFiles(zip)
   };
 }
 
@@ -62,14 +82,18 @@ async function importPlugin(zip: JSZip): Promise<ImportResult> {
   const skillRoot = skillPath.replace(/\/SKILL\.md$/, "");
   const knowledge = await collectKnowledge(zip, `${skillRoot}/references/`);
 
+  const project = {
+    name: readmeName || parsed.name || plugin.name || "Importerad GPT",
+    description: plugin.description || parsed.description || "",
+    instructions: stripRuntimeAdapter(parsed.body),
+    knowledge
+  };
   return {
     runtime: "plugin",
-    project: {
-      name: readmeName || parsed.name || plugin.name || "Importerad GPT",
-      description: plugin.description || parsed.description || "",
-      instructions: stripRuntimeAdapter(parsed.body),
-      knowledge
-    }
+    mode: "editable",
+    project,
+    metadata: { name: project.name, format: "plugin", instructionPath: skillPath },
+    files: await readPackageFiles(zip)
   };
 }
 
@@ -79,9 +103,13 @@ async function importClaude(zip: JSZip): Promise<ImportResult> {
   const [name, description] = parseTitleAndDescription(readme, " – Claude");
   const knowledge = await collectKnowledge(zip, "knowledge/");
 
+  const project = { name, description, instructions, knowledge };
   return {
     runtime: "claude",
-    project: { name, description, instructions, knowledge }
+    mode: "editable",
+    project,
+    metadata: { name, format: "claude", instructionPath: "instructions.md" },
+    files: await readPackageFiles(zip)
   };
 }
 
@@ -91,14 +119,18 @@ async function importOpenCode(zip: JSZip): Promise<ImportResult> {
   const [name, description] = parseTitleAndDescription(readme, " – OpenCode");
   const knowledge = await collectKnowledge(zip, "knowledge/");
 
+  const project = {
+    name,
+    description,
+    instructions: stripRuntimeAdapter(agents),
+    knowledge
+  };
   return {
     runtime: "opencode",
-    project: {
-      name,
-      description,
-      instructions: stripRuntimeAdapter(agents),
-      knowledge
-    }
+    mode: "editable",
+    project,
+    metadata: { name, format: "opencode", instructionPath: "AGENTS.md" },
+    files: await readPackageFiles(zip)
   };
 }
 

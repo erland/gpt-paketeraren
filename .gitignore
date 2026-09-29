@@ -1,0 +1,13 @@
+# Generated build output
+dist/
+build/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local/editor files
+.DS_Store
+.vscode/
+.idea/

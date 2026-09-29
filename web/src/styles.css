@@ -60,3 +60,27 @@ small { display: block; margin-top: 7px; }
 @media (max-width: 700px) {
   .import-card { align-items: stretch; flex-direction: column; }
 }
+
+input[readonly], textarea[readonly] { background: #f8fafc; color: #334155; }
+.readonly-banner { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+.readonly-banner strong { display: inline-block; margin-bottom: 4px; }
+.readonly-banner p { margin: 0; color: #64748b; }
+.package-meta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.package-meta span { background: #f1f5f9; border-radius: 999px; padding: 6px 10px; font-size: .85rem; white-space: nowrap; }
+.file-link { background: transparent; color: #0f172a; padding: 0; text-align: left; font-weight: 600; overflow-wrap: anywhere; }
+.file-link:hover:not(:disabled) { text-decoration: underline; }
+.file-link:disabled { cursor: default; color: #94a3b8; }
+.package-files li > span { color: #64748b; font-size: .9rem; white-space: nowrap; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, .58); display: grid; place-items: center; padding: 20px; z-index: 1000; }
+.modal { width: min(900px, 100%); max-height: min(82vh, 900px); display: flex; flex-direction: column; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 80px rgba(15, 23, 42, .35); }
+.modal header { display: flex; gap: 16px; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding: 14px 18px; }
+.modal header h2 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.modal-close { background: #e2e8f0; min-width: 42px; min-height: 42px; font-size: 1.4rem; line-height: 1; }
+.modal pre { margin: 0; padding: 18px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: .9rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@media (max-width: 700px) {
+  .readonly-banner { flex-direction: column; }
+  .package-meta { justify-content: flex-start; }
+  .modal-backdrop { padding: 8px; }
+  .modal { max-height: 90vh; border-radius: 12px; }
+  .modal pre { padding: 14px; }
+}

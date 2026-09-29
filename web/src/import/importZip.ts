@@ -51,6 +51,8 @@ async function importPlugin(zip: JSZip): Promise<ImportResult> {
     name?: string;
     description?: string;
   };
+  const readme = await text(zip, "README.md");
+  const [readmeName] = parseTitleAndDescription(readme);
 
   const skillPath = Object.keys(zip.files).find((name) => /^skills\/[^/]+\/SKILL\.md$/.test(name));
   if (!skillPath) throw new Error("Plugin-distributionen saknar SKILL.md.");
@@ -63,8 +65,8 @@ async function importPlugin(zip: JSZip): Promise<ImportResult> {
   return {
     runtime: "plugin",
     project: {
-      name: parsed.name || plugin.name || "Importerad GPT",
-      description: parsed.description || plugin.description || "",
+      name: readmeName || parsed.name || plugin.name || "Importerad GPT",
+      description: plugin.description || parsed.description || "",
       instructions: stripRuntimeAdapter(parsed.body),
       knowledge
     }
@@ -112,10 +114,26 @@ function parseTitleAndDescription(markdown: string, suffix = ""): [string, strin
   const rawTitle = titleIndex >= 0 ? lines[titleIndex].slice(2).trim() : "Importerad GPT";
   const name = suffix && rawTitle.endsWith(suffix) ? rawTitle.slice(0, -suffix.length) : rawTitle;
 
+  const explicitDescription = lines
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("Beskrivning:"));
+
+  if (explicitDescription) {
+    return [name, explicitDescription.slice("Beskrivning:".length).trim()];
+  }
+
   const description = lines
     .slice(titleIndex + 1)
     .map((line) => line.trim())
-    .find((line) => line && !line.startsWith("#") && !line.startsWith("-") && !/^\d+\./.test(line)) ?? "";
+    .find((line) =>
+      line &&
+      !line.startsWith("#") &&
+      !line.startsWith("-") &&
+      !/^\d+\./.test(line) &&
+      !line.startsWith("Använd detta ZIP-arkiv") &&
+      !line.startsWith("Använd innehållet i denna ZIP") &&
+      !line.startsWith("Plugin-distribution genererad")
+    ) ?? "";
 
   return [name, description];
 }

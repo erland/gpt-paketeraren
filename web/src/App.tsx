@@ -1,8 +1,27 @@
 import { ChangeEvent, useMemo, useState } from "react";
 import { buildChatZip } from "./distributions/chat";
+import { buildClaudeZip } from "./distributions/claude";
+import { buildOpenCodeZip } from "./distributions/opencode";
+import { buildPluginZip } from "./distributions/plugin";
 import { downloadBlob } from "./download/download";
 import { GptProject, KnowledgeFile, toProjectId, validateProject } from "./domain/project";
 import "./styles.css";
+
+type Runtime = "chat" | "plugin" | "claude" | "opencode";
+
+const builders: Record<Runtime, (project: GptProject) => Promise<Blob>> = {
+  chat: buildChatZip,
+  plugin: buildPluginZip,
+  claude: buildClaudeZip,
+  opencode: buildOpenCodeZip
+};
+
+const labels: Record<Runtime, string> = {
+  chat: "Chat",
+  plugin: "ChatGPT Plugin",
+  claude: "Claude",
+  opencode: "OpenCode"
+};
 
 export default function App() {
   const [name, setName] = useState("");
@@ -10,6 +29,7 @@ export default function App() {
   const [instructions, setInstructions] = useState("");
   const [knowledge, setKnowledge] = useState<KnowledgeFile[]>([]);
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState<Runtime | null>(null);
 
   const project: GptProject = useMemo(
     () => ({ name, description, instructions, knowledge }),
@@ -33,7 +53,7 @@ export default function App() {
     setKnowledge((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
-  async function downloadChat() {
+  async function downloadRuntime(runtime: Runtime) {
     setMessage("");
     const validationErrors = validateProject(project);
     if (validationErrors.length > 0) {
@@ -41,16 +61,20 @@ export default function App() {
       return;
     }
 
+    setBusy(runtime);
     try {
-      const zip = await buildChatZip(project);
-      downloadBlob(zip, `${toProjectId(project.name)}-chat.zip`);
-      setMessage("Chat ZIP skapades lokalt i webbläsaren.");
+      const zip = await builders[runtime](project);
+      downloadBlob(zip, `${toProjectId(project.name)}-${runtime}.zip`);
+      setMessage(`${labels[runtime]} ZIP skapades lokalt i webbläsaren.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Kunde inte skapa Chat ZIP.");
+      setMessage(error instanceof Error ? error.message : `Kunde inte skapa ${labels[runtime]} ZIP.`);
+    } finally {
+      setBusy(null);
     }
   }
 
   const totalKnowledgeSize = knowledge.reduce((sum, item) => sum + item.size, 0);
+  const runtimes: Runtime[] = ["chat", "plugin", "claude", "opencode"];
 
   return (
     <main className="page">
@@ -93,7 +117,7 @@ export default function App() {
           <div className="section-heading">
             <div>
               <h2>Knowledge-filer</h2>
-              <p>Valfria filer som följer med distributionen.</p>
+              <p>Valfria filer som följer med distributionerna.</p>
             </div>
             <label className="file-button">
               Lägg till filer
@@ -117,14 +141,24 @@ export default function App() {
         </div>
       </section>
 
-      <section className="card downloads">
-        <div>
+      <section className="card">
+        <div className="download-heading">
           <h2>Hämta distribution</h2>
-          <p>Distributionen skapas först när du klickar på Hämta.</p>
+          <p>Varje ZIP skapas först när du klickar på motsvarande knapp.</p>
         </div>
-        <button className="primary" type="button" onClick={downloadChat} disabled={errors.length > 0}>
-          Hämta Chat ZIP
-        </button>
+        <div className="download-grid">
+          {runtimes.map((runtime) => (
+            <button
+              key={runtime}
+              className="primary"
+              type="button"
+              onClick={() => downloadRuntime(runtime)}
+              disabled={errors.length > 0 || busy !== null}
+            >
+              {busy === runtime ? "Skapar…" : `Hämta ${labels[runtime]} ZIP`}
+            </button>
+          ))}
+        </div>
         {message && <p className="status" role="status">{message}</p>}
       </section>
     </main>

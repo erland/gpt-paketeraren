@@ -4,6 +4,7 @@ import { buildClaudeZip } from "./distributions/claude";
 import { buildOpenCodeZip } from "./distributions/opencode";
 import { buildPluginZip } from "./distributions/plugin";
 import { downloadBlob } from "./download/download";
+import { importRuntimeZip } from "./import/importZip";
 import { GptProject, KnowledgeFile, toProjectId, validateProject } from "./domain/project";
 import "./styles.css";
 
@@ -30,6 +31,7 @@ export default function App() {
   const [knowledge, setKnowledge] = useState<KnowledgeFile[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<Runtime | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const project: GptProject = useMemo(
     () => ({ name, description, instructions, knowledge }),
@@ -51,6 +53,27 @@ export default function App() {
 
   function removeKnowledge(index: number) {
     setKnowledge((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  async function importZip(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    setMessage("");
+    try {
+      const imported = await importRuntimeZip(file);
+      setName(imported.project.name);
+      setDescription(imported.project.description);
+      setInstructions(imported.project.instructions);
+      setKnowledge(imported.project.knowledge);
+      setMessage(`Importerade ${labels[imported.runtime]}-distributionen.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Kunde inte importera ZIP-filen.");
+    } finally {
+      setImporting(false);
+    }
   }
 
   async function downloadRuntime(runtime: Runtime) {
@@ -85,6 +108,17 @@ export default function App() {
           Innehållet stannar på din enhet. Instruktionen används som du skriver den och
           skickas inte till någon server.
         </p>
+      </section>
+
+      <section className="card import-card">
+        <div>
+          <h2>Öppna befintlig GPT ZIP</h2>
+          <p>Importera en tidigare Chat-, ChatGPT Plugin-, Claude- eller OpenCode-distribution.</p>
+        </div>
+        <label className="file-button">
+          {importing ? "Öppnar…" : "Öppna GPT ZIP"}
+          <input type="file" accept=".zip,application/zip" onChange={importZip} disabled={importing} />
+        </label>
       </section>
 
       <section className="card form-grid" aria-label="GPT-projekt">
@@ -153,7 +187,7 @@ export default function App() {
               className="primary"
               type="button"
               onClick={() => downloadRuntime(runtime)}
-              disabled={errors.length > 0 || busy !== null}
+              disabled={errors.length > 0 || busy !== null || importing}
             >
               {busy === runtime ? "Skapar…" : `Hämta ${labels[runtime]} ZIP`}
             </button>

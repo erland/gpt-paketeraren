@@ -52,3 +52,20 @@ python scripts/import_existing.py existing.zip imported-project
 ```
 
 Importen normaliserar en stödd distribution till `gpt.yaml`, `instructions.md` och `knowledge/` för granskning innan ny paketering.
+
+
+## PWA
+
+En första PWA-variant utvecklas under `web/`. Den kör helt lokalt i webbläsaren och ändrar inte användarens GPT-instruktion.
+
+Utveckling:
+
+```bash
+cd web
+npm install
+npm test
+npm run typecheck
+npm run dev
+```
+
+I den första vertikala versionen kan användaren ange namn, beskrivning och instruktion, lägga till Knowledge-filer och skapa en Chat ZIP on-demand.

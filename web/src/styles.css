@@ -40,3 +40,11 @@ small { display: block; margin-top: 7px; }
   .section-heading, .downloads { align-items: stretch; flex-direction: column; }
   .primary, .file-button { justify-content: center; width: 100%; }
 }
+
+.download-heading { margin-bottom: 16px; }
+.download-heading h2 { margin: 0 0 4px; }
+.download-heading p { margin: 0; color: #64748b; }
+.download-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 700px) {
+  .download-grid { grid-template-columns: 1fr; }
+}

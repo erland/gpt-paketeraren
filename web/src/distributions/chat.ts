@@ -3,18 +3,17 @@ import { GptProject, normalizeKnowledgePath, toProjectId } from "../domain/proje
 
 export async function buildChatZip(project: GptProject): Promise<Blob> {
   const zip = new JSZip();
+  const projectId = toProjectId(project.name);
 
   zip.file(
     "START-HERE.md",
     `# ${project.name}
 
-Använd detta ZIP-arkiv som GPT-kontext i en ChatGPT-konversation.
+${project.description}
 
-- Instruktionen finns i \`assistant/instructions.md\`.
-- Eventuella Knowledge-filer finns under \`knowledge/\`.
-- Bevara GPT-instruktionen som den är skriven.
+Använd innehållet i denna ZIP som GPT-kontext i den här konversationen.
 
-Beskrivning: ${project.description}
+Läs först \`assistant/instructions.md\`. Knowledge-filer finns under \`knowledge/\` när sådana finns.
 `
   );
 
@@ -30,6 +29,6 @@ Beskrivning: ${project.description}
     compression: "DEFLATE",
     compressionOptions: { level: 6 },
     mimeType: "application/zip",
-    comment: `GPT Paketeraren: ${toProjectId(project.name)}`
+    comment: `GPT Paketeraren: ${projectId}`
   });
 }

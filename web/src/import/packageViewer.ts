@@ -50,7 +50,7 @@ export async function detectPackageMetadata(zip: JSZip, files: PackageFile[]): P
   return { name, version, format, instructionPath };
 }
 
-function isTextFile(path: string): boolean {
+export function isTextFile(path: string): boolean {
   const name = path.split("/").pop() ?? path;
   if (name === "VERSION" || name === "LICENSE" || name === "NOTICE") return true;
   const dot = name.lastIndexOf(".");

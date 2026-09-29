@@ -15,17 +15,42 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Test
+
+      - name: Test Python packager
         run: |
           python tests/test_instruction_contract.py
           python tests/test_roundtrip.py
           python tests/test_release_contract.py
+
       - name: Project hygiene
         run: python scripts/project_hygiene.py
+
       - name: Build project and runtime distributions
         run: python scripts/build_distributions.py --project-root . --version 0.0.0-ci --targets project,chat,plugin,claude,opencode
+
       - name: Validate distributions
         run: python scripts/validate_distributions.py --project-root . --version 0.0.0-ci
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install PWA dependencies
+        working-directory: web
+        run: npm install --no-audit --no-fund
+
+      - name: Test PWA
+        working-directory: web
+        run: npm test
+
+      - name: Typecheck PWA
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Build PWA
+        working-directory: web
+        run: npm run build

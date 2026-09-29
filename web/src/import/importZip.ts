@@ -158,10 +158,15 @@ function parseSkill(markdown: string): { name: string; description: string; body
     }
   }
 
+  let body = normalized.slice(end + 5);
+  if (body.startsWith("\n")) {
+    body = body.slice(1);
+  }
+
   return {
     name: data.name ?? "",
     description: data.description ?? "",
-    body: normalized.slice(end + 5)
+    body
   };
 }
 

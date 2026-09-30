@@ -34,11 +34,13 @@ All ZIP-inspektion och paketering sker lokalt i webbläsaren.
 
 ```bash
 cd web
-npm install
+npm ci
 npm test
 npm run typecheck
 npm run dev
 ```
+
+`web/package-lock.json` är versionshanterad. Använd `npm ci` för reproducerbara installationer som matchar CI och GitHub Pages. Använd `npm install` när dependencies avsiktligt ändras och commit:a då den uppdaterade lockfilen.
 
 Produktionsbuild:
 
@@ -90,7 +92,7 @@ PWA:n har dessutom egen importlogik för både redigerbara GPT Paketeraren-distr
 
 ## GitHub Actions
 
-`.github/workflows/ci.yml` kör tester, project hygiene, build och distributionsvalidering på push, pull request och manuell körning.
+`.github/workflows/ci.yml` kör tester, project hygiene, build och distributionsvalidering på push, pull request och manuell körning. PWA-dependencies installeras med `npm ci` från den versionshanterade lockfilen.
 
 `.github/workflows/release.yml` triggas när en GitHub Release publiceras. Versionen härleds från release-taggen, exempelvis `v0.1.1`, och workflowet bygger samt laddar upp:
 
@@ -102,4 +104,4 @@ PWA:n har dessutom egen importlogik för både redigerbara GPT Paketeraren-distr
 - `SHA256SUMS.txt`
 - `DELIVERY-MANIFEST.json`
 
-`.github/workflows/pages.yml` bygger, testar och publicerar PWA:n till GitHub Pages.
+`.github/workflows/pages.yml` bygger, testar och publicerar PWA:n till GitHub Pages med samma låsta dependency-träd som CI.

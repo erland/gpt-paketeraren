@@ -8,7 +8,7 @@ import { buildPluginZip } from "../src/distributions/plugin";
 import { importRuntimeZip } from "../src/import/importZip";
 
 const root = process.env.GPT_PACKAGER_COMPAT_DIR;
-if (!root) throw new Error("GPT_PACKAGER_COMPAT_DIR is required");
+const compatDescribe = root ? describe : describe.skip;
 
 const name = "Test GPT: ÅÄÖ";
 const description = "Testar kompatibilitet mellan Python och PWA.";

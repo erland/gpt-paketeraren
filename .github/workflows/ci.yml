@@ -49,6 +49,14 @@ jobs:
         working-directory: web
         run: npm test
 
+      - name: Cross-runtime compatibility
+        env:
+          GPT_PACKAGER_COMPAT_DIR: ${{ github.workspace }}/.compat
+        run: |
+          python tests/cross_runtime_compat.py prepare .compat
+          npm --prefix web run test:compat
+          python tests/cross_runtime_compat.py verify .compat
+
       - name: Typecheck PWA
         working-directory: web
         run: npm run typecheck

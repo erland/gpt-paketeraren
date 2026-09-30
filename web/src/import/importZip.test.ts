@@ -5,7 +5,8 @@ import { buildClaudeZip } from "../distributions/claude";
 import { buildOpenCodeZip } from "../distributions/opencode";
 import { buildPluginZip } from "../distributions/plugin";
 import { GptProject } from "../domain/project";
-import { importRuntimeZip } from "./importZip";
+import { assertZipInputSize, importRuntimeZip } from "./importZip";
+import { readPackageFiles } from "./packageViewer";
 
 const project: GptProject = {
   name: "Produktinformatören",
@@ -71,5 +72,49 @@ describe("importRuntimeZip", () => {
   it("rejects unknown zip format", async () => {
     const zip = new JSZip(); zip.file("unknown.txt", "x");
     await expect(importRuntimeZip(await zip.generateAsync({ type: "blob" }))).rejects.toThrow(/känns inte igen/);
+  });
+
+  it("rejects an oversized ZIP before parsing it", () => {
+    expect(() => assertZipInputSize(11, 10)).toThrow(/ZIP-filen är för stor/);
+    expect(() => assertZipInputSize(10, 10)).not.toThrow();
+  });
+
+  it("rejects packages with too many files", async () => {
+    const zip = new JSZip();
+    zip.file("a.txt", "a");
+    zip.file("b.txt", "b");
+    zip.file("c.txt", "c");
+
+    await expect(readPackageFiles(zip, {
+      maxFiles: 2,
+      maxSingleFileBytes: 100,
+      maxTotalBytes: 100,
+      maxTextPreviewBytes: 100
+    })).rejects.toThrow(/för många filer/);
+  });
+
+  it("rejects a file that is too large after decompression", async () => {
+    const zip = new JSZip();
+    zip.file("large.txt", "12345");
+
+    await expect(readPackageFiles(zip, {
+      maxFiles: 10,
+      maxSingleFileBytes: 4,
+      maxTotalBytes: 100,
+      maxTextPreviewBytes: 100
+    })).rejects.toThrow(/large\.txt.*för stor/);
+  });
+
+  it("rejects excessive total decompressed size", async () => {
+    const zip = new JSZip();
+    zip.file("a.txt", "123");
+    zip.file("b.txt", "456");
+
+    await expect(readPackageFiles(zip, {
+      maxFiles: 10,
+      maxSingleFileBytes: 10,
+      maxTotalBytes: 5,
+      maxTextPreviewBytes: 100
+    })).rejects.toThrow(/för stort efter dekomprimering/);
   });
 });

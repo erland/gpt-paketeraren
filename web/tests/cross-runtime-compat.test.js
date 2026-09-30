@@ -24,7 +24,7 @@ const builders = {
   opencode: buildOpenCodeZip
 };
 
-describe("Python/PWA runtime compatibility", () => {
+compatDescribe("Python/PWA runtime compatibility", () => {
   for (const runtime of Object.keys(builders)) {
     it(`imports Python ${runtime} and exports PWA ${runtime}`, async () => {
       const pythonZip = await readFile(join(root, "python", `test-gpt-${runtime}-0.0.0-compat.zip`));

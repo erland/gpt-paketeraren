@@ -5,6 +5,7 @@ import { detectPackageMetadata, isAdvancedPackage, readPackageFiles } from "./pa
 
 const ADAPTER_BEGIN = "<!-- GPT-PACKAGER:RUNTIME-ADAPTER:BEGIN -->";
 const ADAPTER_END = "<!-- GPT-PACKAGER:RUNTIME-ADAPTER:END -->";
+export const MAX_ZIP_INPUT_BYTES = 50 * 1024 * 1024;
 
 export type ImportedRuntime = "chat" | "plugin" | "claude" | "opencode" | "package";
 
@@ -16,7 +17,14 @@ export interface ImportResult {
   files: PackageFile[];
 }
 
+export function assertZipInputSize(size: number, maxBytes = MAX_ZIP_INPUT_BYTES): void {
+  if (size > maxBytes) {
+    throw new Error(`ZIP-filen är för stor (max ${formatLimit(maxBytes)}).`);
+  }
+}
+
 export async function importRuntimeZip(file: Blob): Promise<ImportResult> {
+  assertZipInputSize(file.size);
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const names = Object.keys(zip.files);
   const files = await readPackageFiles(zip);
@@ -32,29 +40,29 @@ export async function importRuntimeZip(file: Blob): Promise<ImportResult> {
   }
 
   if (zip.file("assistant/instructions.md") && zip.file("START-HERE.md")) {
-    return importChat(zip);
+    return importChat(files);
   }
 
   if (zip.file("plugin.json") && names.some((name) => /^skills\/[^/]+\/SKILL\.md$/.test(name))) {
-    return importPlugin(zip);
+    return importPlugin(files);
   }
 
   if (zip.file("instructions.md") && zip.file("README.md")) {
-    return importClaude(zip);
+    return importClaude(files);
   }
 
   if (zip.file("AGENTS.md") && zip.file("README.md")) {
-    return importOpenCode(zip);
+    return importOpenCode(files);
   }
 
   throw new Error("ZIP-filen känns inte igen som en stödd GPT Paketeraren-distribution.");
 }
 
-async function importChat(zip: JSZip): Promise<ImportResult> {
-  const instructions = await text(zip, "assistant/instructions.md");
-  const start = await text(zip, "START-HERE.md");
+async function importChat(files: PackageFile[]): Promise<ImportResult> {
+  const instructions = text(files, "assistant/instructions.md");
+  const start = text(files, "START-HERE.md");
   const [name, description] = parseTitleAndDescription(start);
-  const knowledge = await collectKnowledge(zip, "knowledge/");
+  const knowledge = collectKnowledge(files, "knowledge/");
 
   const project = { name, description, instructions, knowledge };
   return {
@@ -62,25 +70,25 @@ async function importChat(zip: JSZip): Promise<ImportResult> {
     mode: "editable",
     project,
     metadata: { name, format: "chat", instructionPath: "assistant/instructions.md" },
-    files: await readPackageFiles(zip)
+    files
   };
 }
 
-async function importPlugin(zip: JSZip): Promise<ImportResult> {
-  const plugin = JSON.parse(await text(zip, "plugin.json")) as {
+async function importPlugin(files: PackageFile[]): Promise<ImportResult> {
+  const plugin = JSON.parse(text(files, "plugin.json")) as {
     name?: string;
     description?: string;
   };
-  const readme = await text(zip, "README.md");
+  const readme = text(files, "README.md");
   const [readmeName] = parseTitleAndDescription(readme);
 
-  const skillPath = Object.keys(zip.files).find((name) => /^skills\/[^/]+\/SKILL\.md$/.test(name));
+  const skillPath = files.find((item) => /^skills\/[^/]+\/SKILL\.md$/.test(item.path))?.path;
   if (!skillPath) throw new Error("Plugin-distributionen saknar SKILL.md.");
 
-  const skill = await text(zip, skillPath);
+  const skill = text(files, skillPath);
   const parsed = parseSkill(skill);
   const skillRoot = skillPath.replace(/\/SKILL\.md$/, "");
-  const knowledge = await collectKnowledge(zip, `${skillRoot}/references/`);
+  const knowledge = collectKnowledge(files, `${skillRoot}/references/`);
 
   const project = {
     name: readmeName || parsed.name || plugin.name || "Importerad GPT",
@@ -93,15 +101,15 @@ async function importPlugin(zip: JSZip): Promise<ImportResult> {
     mode: "editable",
     project,
     metadata: { name: project.name, format: "plugin", instructionPath: skillPath },
-    files: await readPackageFiles(zip)
+    files
   };
 }
 
-async function importClaude(zip: JSZip): Promise<ImportResult> {
-  const instructions = await text(zip, "instructions.md");
-  const readme = await text(zip, "README.md");
+async function importClaude(files: PackageFile[]): Promise<ImportResult> {
+  const instructions = text(files, "instructions.md");
+  const readme = text(files, "README.md");
   const [name, description] = parseTitleAndDescription(readme, " – Claude");
-  const knowledge = await collectKnowledge(zip, "knowledge/");
+  const knowledge = collectKnowledge(files, "knowledge/");
 
   const project = { name, description, instructions, knowledge };
   return {
@@ -109,15 +117,15 @@ async function importClaude(zip: JSZip): Promise<ImportResult> {
     mode: "editable",
     project,
     metadata: { name, format: "claude", instructionPath: "instructions.md" },
-    files: await readPackageFiles(zip)
+    files
   };
 }
 
-async function importOpenCode(zip: JSZip): Promise<ImportResult> {
-  const agents = await text(zip, "AGENTS.md");
-  const readme = await text(zip, "README.md");
+async function importOpenCode(files: PackageFile[]): Promise<ImportResult> {
+  const agents = text(files, "AGENTS.md");
+  const readme = text(files, "README.md");
   const [name, description] = parseTitleAndDescription(readme, " – OpenCode");
-  const knowledge = await collectKnowledge(zip, "knowledge/");
+  const knowledge = collectKnowledge(files, "knowledge/");
 
   const project = {
     name,
@@ -130,14 +138,17 @@ async function importOpenCode(zip: JSZip): Promise<ImportResult> {
     mode: "editable",
     project,
     metadata: { name, format: "opencode", instructionPath: "AGENTS.md" },
-    files: await readPackageFiles(zip)
+    files
   };
 }
 
-async function text(zip: JSZip, path: string): Promise<string> {
-  const file = zip.file(path);
+function text(files: PackageFile[], path: string): string {
+  const file = files.find((item) => item.path === path);
   if (!file) throw new Error(`ZIP-filen saknar ${path}.`);
-  return file.async("string");
+  if (file.textContent === undefined) {
+    throw new Error(`Filen ${path} är för stor eller har ett format som inte kan läsas som text.`);
+  }
+  return file.textContent;
 }
 
 function parseTitleAndDescription(markdown: string, suffix = ""): [string, string] {
@@ -215,16 +226,19 @@ export function stripRuntimeAdapter(value: string): string {
   return (before + after).replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "\n");
 }
 
-async function collectKnowledge(zip: JSZip, prefix: string): Promise<KnowledgeFile[]> {
-  const files = Object.values(zip.files)
-    .filter((entry) => !entry.dir && entry.name.startsWith(prefix))
-    .sort((a, b) => a.name.localeCompare(b.name));
+function collectKnowledge(files: PackageFile[], prefix: string): KnowledgeFile[] {
+  return files
+    .filter((item) => item.path.startsWith(prefix))
+    .map((item) => ({
+      path: item.path.slice(prefix.length),
+      content: item.content,
+      size: item.size
+    }))
+    .filter((item) => Boolean(item.path))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
 
-  return Promise.all(
-    files.map(async (entry) => {
-      const path = entry.name.slice(prefix.length);
-      const content = new Blob([await entry.async("arraybuffer")]);
-      return { path, content, size: content.size };
-    })
-  );
+function formatLimit(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${Math.ceil(bytes / 1024 / 1024)} MB`;
 }

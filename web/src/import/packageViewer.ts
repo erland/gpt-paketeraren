@@ -4,17 +4,89 @@ import { PackageFile, PackageMetadata } from "../domain/package";
 const TEXT_EXTENSIONS = new Set(["md","txt","json","yaml","yml","xml","csv","ts","tsx","js","jsx","py","java","kt","kts","properties","toml","ini","cfg","conf","html","css","scss","sh","sql","graphql"]);
 const INSTRUCTION_FALLBACKS = ["assistant/instructions.md","runtime/canonical-instructions.md","runtime/instructions.md","instructions.md","gpt-instructions.md","gpt_instructions.md","instructions.txt"];
 
-export async function readPackageFiles(zip: JSZip): Promise<PackageFile[]> {
-  const entries = Object.values(zip.files).filter((entry) => !entry.dir).sort((a,b) => a.name.localeCompare(b.name));
-  return Promise.all(entries.map(async (entry) => {
+export interface PackageLimits {
+  maxFiles: number;
+  maxSingleFileBytes: number;
+  maxTotalBytes: number;
+  maxTextPreviewBytes: number;
+}
+
+export const DEFAULT_PACKAGE_LIMITS: PackageLimits = {
+  maxFiles: 500,
+  maxSingleFileBytes: 50 * 1024 * 1024,
+  maxTotalBytes: 100 * 1024 * 1024,
+  maxTextPreviewBytes: 2 * 1024 * 1024
+};
+
+export function assertPackageWithinLimits(
+  zip: JSZip,
+  limits: PackageLimits = DEFAULT_PACKAGE_LIMITS
+): void {
+  const entries = Object.values(zip.files).filter((entry) => !entry.dir);
+
+  if (entries.length > limits.maxFiles) {
+    throw new Error(`ZIP-paketet innehåller för många filer (max ${limits.maxFiles}).`);
+  }
+
+  let totalBytes = 0;
+  for (const entry of entries) {
+    const declaredSize = declaredUncompressedSize(entry);
+    if (declaredSize === undefined) continue;
+
+    if (declaredSize > limits.maxSingleFileBytes) {
+      throw new Error(
+        `Filen ${entry.name} är för stor efter dekomprimering (max ${formatLimit(limits.maxSingleFileBytes)}).`
+      );
+    }
+
+    totalBytes += declaredSize;
+    if (totalBytes > limits.maxTotalBytes) {
+      throw new Error(
+        `ZIP-paketet är för stort efter dekomprimering (max ${formatLimit(limits.maxTotalBytes)}).`
+      );
+    }
+  }
+}
+
+export async function readPackageFiles(
+  zip: JSZip,
+  limits: PackageLimits = DEFAULT_PACKAGE_LIMITS
+): Promise<PackageFile[]> {
+  assertPackageWithinLimits(zip, limits);
+
+  const entries = Object.values(zip.files)
+    .filter((entry) => !entry.dir)
+    .sort((a,b) => a.name.localeCompare(b.name));
+
+  const files: PackageFile[] = [];
+  let totalBytes = 0;
+
+  for (const entry of entries) {
     const bytes = await entry.async("arraybuffer");
+    const size = bytes.byteLength;
+
+    if (size > limits.maxSingleFileBytes) {
+      throw new Error(
+        `Filen ${entry.name} är för stor efter dekomprimering (max ${formatLimit(limits.maxSingleFileBytes)}).`
+      );
+    }
+
+    totalBytes += size;
+    if (totalBytes > limits.maxTotalBytes) {
+      throw new Error(
+        `ZIP-paketet är för stort efter dekomprimering (max ${formatLimit(limits.maxTotalBytes)}).`
+      );
+    }
+
     const content = new Blob([bytes]);
-    const result: PackageFile = { path: entry.name, size: content.size, content };
-    if (isTextFile(entry.name) && content.size <= 2 * 1024 * 1024) {
+    const result: PackageFile = { path: entry.name, size, content };
+    if (isTextFile(entry.name) && size <= limits.maxTextPreviewBytes) {
       result.textContent = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
     }
-    return result;
-  }));
+    files.push(result);
+  }
+
+  return files;
 }
 
 export function isAdvancedPackage(zip: JSZip): boolean {
@@ -56,6 +128,17 @@ export function isTextFile(path: string): boolean {
   const dot = name.lastIndexOf(".");
   return dot >= 0 && TEXT_EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
 }
+
+function declaredUncompressedSize(entry: unknown): number | undefined {
+  const data = (entry as { _data?: { uncompressedSize?: unknown } })._data;
+  return typeof data?.uncompressedSize === "number" ? data.uncompressedSize : undefined;
+}
+
+function formatLimit(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${Math.ceil(bytes / 1024 / 1024)} MB`;
+}
+
 function markdownTitle(value: string): string {
   const line = value.replace(/\r\n/g, "\n").split("\n").find((item) => item.startsWith("# "));
   return line?.slice(2).trim() ?? "";

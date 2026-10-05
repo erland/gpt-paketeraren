@@ -96,6 +96,26 @@ def build_chat(project: Path, gpt: dict, instructions: str, root: Path, version:
     (root / "VERSION").write_text(version + "\n", encoding="utf-8")
 
 
+def plugin_runtime_contract(gpt: dict) -> dict:
+    return {
+        "schema_version": 1,
+        "runtime_id": "openai_plugin",
+        "adapter": {
+            "mode": "openai_plugin",
+            "skills_first": True,
+            "skills": [gpt["id"]],
+            "mcp_generated": False,
+            "ui_generated": False,
+            "hooks_generated": False,
+            "script_resources": {
+                "packaged": [],
+                "mcp_required_for_resource_use": False,
+            },
+            "canonical_scope": ["instructions", "knowledge"],
+        },
+    }
+
+
 def build_plugin(project: Path, gpt: dict, instructions: str, root: Path, version: str) -> None:
     skill = root / "skills" / gpt["id"]
     refs = skill / "references"
@@ -109,13 +129,17 @@ def build_plugin(project: Path, gpt: dict, instructions: str, root: Path, versio
     }
     (root / "plugin.json").write_text(json.dumps(plugin, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (root / "README.md").write_text(
-        f"# {gpt['name']}\n\nPlugin-distribution genererad från canonical GPT-innehåll.\n",
+        f"# {gpt['name']}\n\nOpenAI Plugin-distribution genererad från canonical GPT-innehåll.\n",
+        encoding="utf-8",
+    )
+    (root / "runtime-contract.json").write_text(
+        json.dumps(plugin_runtime_contract(gpt), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     (skill / "SKILL.md").write_text(
         "---\n"
-        f"name: {gpt['id']}\n"
-        f"description: {gpt['description']}\n"
+        f"name: {json.dumps(gpt['id'], ensure_ascii=False)}\n"
+        f"description: {json.dumps(gpt['description'], ensure_ascii=False)}\n"
         "---\n\n"
         + instructions
         + "\n<!-- GPT-PACKAGER:RUNTIME-ADAPTER:BEGIN -->\n"

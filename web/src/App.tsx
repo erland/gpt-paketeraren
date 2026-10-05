@@ -8,6 +8,7 @@ import { importRuntimeZip } from "./import/importZip";
 import { isTextFile } from "./import/packageViewer";
 import { PackageFile, PackageMetadata } from "./domain/package";
 import { GptProject, KnowledgeFile, toProjectId, validateProject } from "./domain/project";
+import { FilePreview } from "./preview/FilePreview";
 import "./styles.css";
 
 type Runtime = "chat" | "plugin" | "claude" | "opencode";
@@ -16,7 +17,7 @@ type ViewMode = "editable" | "readonly";
 const builders: Record<Runtime, (project: GptProject) => Promise<Blob>> = {
   chat: buildChatZip, plugin: buildPluginZip, claude: buildClaudeZip, opencode: buildOpenCodeZip
 };
-const labels: Record<Runtime, string> = { chat: "Chat", plugin: "ChatGPT Plugin", claude: "Claude", opencode: "OpenCode" };
+const labels: Record<Runtime, string> = { chat: "Chat", plugin: "OpenAI Plugin", claude: "Claude", opencode: "OpenCode" };
 
 export default function App() {
   const [name, setName] = useState("");
@@ -65,7 +66,7 @@ export default function App() {
         setDescription(formatPackageDescription(imported.metadata));
         setInstructions(instruction);
         setKnowledge([]);
-        setMessage("Importerade GPT Byggaren-distributionen i read-only-läge.");
+        setMessage("Importerade en avancerad GPT-distribution i read-only-läge.");
       } else if (imported.project) {
         setName(imported.project.name);
         setDescription(imported.project.description);
@@ -112,11 +113,11 @@ export default function App() {
       <section className="hero">
         <p className="eyebrow">GPT Paketeraren</p>
         <h1>Skapa och visa GPT-distributioner i webbläsaren</h1>
-        <p>Innehållet stannar på din enhet. Vanliga GPT Paketeraren-distributioner kan redigeras; avancerade GPT Byggaren-paket visas read-only.</p>
+        <p>Innehållet stannar på din enhet. Vanliga GPT Paketeraren-distributioner kan redigeras; avancerade GPT-paket visas read-only.</p>
       </section>
 
       <section className="card import-card">
-        <div><h2>Öppna befintlig GPT ZIP</h2><p>Importera GPT Paketeraren- eller GPT Byggaren-distributioner.</p></div>
+        <div><h2>Öppna befintlig GPT ZIP</h2><p>Importera GPT Paketeraren- eller avancerade GPT-distributioner.</p></div>
         <label className="file-button">{importing ? "Öppnar…" : "Öppna GPT ZIP"}<input type="file" accept=".zip,application/zip" onChange={importZip} disabled={importing} /></label>
       </section>
 
@@ -146,7 +147,7 @@ export default function App() {
 
         {readOnly && (
           <div className="full">
-            <div className="section-heading"><div><h2>Paketfiler</h2><p>Klicka på textfiler för att visa dem. Binära filer listas men öppnas inte.</p></div></div>
+            <div className="section-heading"><div><h2>Paketfiler</h2><p>Markdown renderas som dokument. YAML, JSON, XML och källkod visas med syntaxmarkering.</p></div></div>
             <ul className="files package-files">{packageFiles.map((item) => (
               <li key={item.path}><button className="file-link" type="button" disabled={item.textContent === undefined} onClick={() => openPackageFile(item)}>{item.path}</button><span>{formatBytes(item.size)}</span></li>
             ))}</ul>
@@ -167,7 +168,7 @@ export default function App() {
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setPreview(null)}>
           <section className="modal" role="dialog" aria-modal="true" aria-labelledby="preview-title" onMouseDown={(event) => event.stopPropagation()}>
             <header><h2 id="preview-title">{preview.title}</h2><button className="modal-close" type="button" onClick={() => setPreview(null)} aria-label="Stäng">×</button></header>
-            <pre>{preview.content}</pre>
+            <FilePreview path={preview.title} content={preview.content} />
           </section>
         </div>
       )}
@@ -176,7 +177,7 @@ export default function App() {
 }
 
 function formatPackageDescription(metadata: PackageMetadata): string {
-  const parts = ["GPT Byggaren-distribution"];
+  const parts = ["Avancerad GPT-distribution"];
   if (metadata.format) parts.push(metadata.format);
   if (metadata.version) parts.push(`version ${metadata.version}`);
   return parts.join(" · ");

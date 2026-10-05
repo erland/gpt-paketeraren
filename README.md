@@ -88,7 +88,7 @@ python scripts/import_existing.py existing.zip imported-project
 
 Importen normaliserar en stödd distribution till `gpt.yaml`, `instructions.md` och `knowledge/` för granskning innan ny paketering.
 
-PWA:n har dessutom egen importlogik för både redigerbara GPT Paketeraren-distributioner och read-only-visning av avancerade GPT Byggaren-distributioner.
+PWA:n har dessutom egen importlogik för både redigerbara GPT Paketeraren-distributioner och read-only-visning av avancerade GPT-distributioner. En gemensam wrapper-katalog i ZIP:en normaliseras bort logiskt när det förbättrar formatdetekteringen.
 
 ## GitHub Actions
 

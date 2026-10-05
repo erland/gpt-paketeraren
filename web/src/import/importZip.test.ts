@@ -6,7 +6,7 @@ import { buildOpenCodeZip } from "../distributions/opencode";
 import { buildPluginZip } from "../distributions/plugin";
 import { GptProject } from "../domain/project";
 import { assertZipInputSize, importRuntimeZip } from "./importZip";
-import { readPackageFiles } from "./packageViewer";
+import { isMarkdownFile, isTextFile, previewLanguage, readPackageFiles } from "./packageViewer";
 
 const project: GptProject = {
   name: "Produktinformatören",
@@ -67,6 +67,44 @@ describe("importRuntimeZip", () => {
     const imported = await importRuntimeZip(await zip.generateAsync({ type: "blob" }));
     expect(imported.mode).toBe("readonly");
     expect(imported.metadata.instructionPath).toBe("runtime/instructions.md");
+  });
+
+  it("opens a wrapped System Modeller-style package read-only", async () => {
+    const zip = new JSZip();
+    zip.file("system-modeller/README.md", "# System Modeller\n\nAvancerad GPT-distribution.\n");
+    zip.file("system-modeller/VERSION", "1.5.0\n");
+    zip.file("system-modeller/instructions/chat-runtime.md", "# System Modeller – canonical runtime instruction\n");
+    zip.file("system-modeller/schemas/model.schema.json", "{}\n");
+    zip.file("system-modeller/metamodel/core.yaml", "schema_version: 1\n");
+    zip.file("system-modeller/docs/model-guide.md", "# Model guide\n");
+    const imported = await importRuntimeZip(await zip.generateAsync({ type: "blob" }));
+
+    expect(imported.mode).toBe("readonly");
+    expect(imported.metadata.name).toBe("System Modeller");
+    expect(imported.metadata.version).toBe("1.5.0");
+    expect(imported.metadata.instructionPath).toBe("instructions/chat-runtime.md");
+    expect(imported.files.some((item) => item.path.startsWith("system-modeller/"))).toBe(false);
+    expect(imported.files.find((item) => item.path === "schemas/model.schema.json")?.textContent).toBe("{}\n");
+  });
+
+  it("normalizes a wrapper directory for editable packages too", async () => {
+    const zip = new JSZip();
+    zip.file("wrapped/START-HERE.md", "# Wrapped GPT\n\nBeskrivning: Test.\n");
+    zip.file("wrapped/assistant/instructions.md", "# Instruction\n");
+    zip.file("wrapped/knowledge/guide.md", "# Guide\n");
+    const imported = await importRuntimeZip(await zip.generateAsync({ type: "blob" }));
+
+    expect(imported.mode).toBe("editable");
+    expect(imported.runtime).toBe("chat");
+    expect(imported.project?.name).toBe("Wrapped GPT");
+    expect(imported.project?.knowledge.map((item) => item.path)).toEqual(["guide.md"]);
+  });
+
+  it("treats compound markdown names as Markdown text", () => {
+    expect(isMarkdownFile("templates/report.md.j2")).toBe(true);
+    expect(isMarkdownFile("README.md.template")).toBe(true);
+    expect(isTextFile("templates/report.md.j2")).toBe(true);
+    expect(previewLanguage("templates/report.md.j2")).toBe("markdown");
   });
 
   it("rejects unknown zip format", async () => {

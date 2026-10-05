@@ -181,6 +181,18 @@ function parseTitleAndDescription(markdown: string, suffix = ""): [string, strin
   return [name, description];
 }
 
+function parseFrontmatterScalar(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"')) {
+    try {
+      return JSON.parse(trimmed) as string;
+    } catch {
+      return trimmed.replace(/^"|"$/g, "");
+    }
+  }
+  return trimmed.replace(/^'|'$/g, "");
+}
+
 function parseSkill(markdown: string): { name: string; description: string; body: string } {
   const normalized = markdown.replace(/\r\n/g, "\n");
   if (!normalized.startsWith("---\n")) {
@@ -197,7 +209,7 @@ function parseSkill(markdown: string): { name: string; description: string; body
   for (const line of frontmatter) {
     const index = line.indexOf(":");
     if (index > 0) {
-      data[line.slice(0, index).trim()] = line.slice(index + 1).trim();
+      data[line.slice(0, index).trim()] = parseFrontmatterScalar(line.slice(index + 1));
     }
   }
 

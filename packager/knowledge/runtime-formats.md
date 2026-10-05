@@ -8,10 +8,11 @@ GPT Paketeraren bygger fyra projektioner av samma canonical GPT.
 - `assistant/instructions.md`
 - `knowledge/`
 
-## ChatGPT Plugin
+## OpenAI Plugin
 
 - `plugin.json`
 - `README.md`
+- `runtime-contract.json`
 - `skills/<id>/SKILL.md`
 - `skills/<id>/references/`
 

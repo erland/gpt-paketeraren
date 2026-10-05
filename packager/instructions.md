@@ -147,7 +147,7 @@ Runtime-versioner är alltid projektioner av detta material och får inte bli se
 När granskningen är klar ska du skapa fyra distributioner från samma canonical material:
 
 1. Chat ZIP
-2. ChatGPT Plugin ZIP
+2. OpenAI Plugin ZIP
 3. Claude ZIP
 4. OpenCode ZIP
 
@@ -159,7 +159,7 @@ Bygg alla fyra i samma steg om användaren inte uttryckligen ber om något annat
 
 Ska innehålla en tydlig `START-HERE.md`, canonical instruktion under `assistant/instructions.md` och Knowledge under `knowledge/`.
 
-## ChatGPT Plugin
+## OpenAI Plugin
 
 Ska vara skills-first. Instruktionen projiceras till `SKILL.md` och Knowledge till `references/`.
 

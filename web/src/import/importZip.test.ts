@@ -10,7 +10,7 @@ import { readPackageFiles } from "./packageViewer";
 
 const project: GptProject = {
   name: "Produktinformatören",
-  description: "Visar produktinformation.",
+  description: 'Visar produktinformation: "lokalt".',
   instructions: "# Instruktion\n\nBehåll exakt.\n",
   knowledge: [{ path: "manual.md", content: new Blob(["manualinnehåll"]), size: 14 }]
 };

@@ -12,7 +12,7 @@ PWA:n kör helt lokalt i webbläsaren. GPT-instruktioner och filer skickas inte 
 
 PWA:n kan:
 
-- skapa GPT-distributioner för Chat, ChatGPT Plugin, Claude och OpenCode
+- skapa GPT-distributioner för Chat, OpenAI Plugin, Claude och OpenCode
 - importera tidigare GPT Paketeraren-distributioner för fortsatt redigering
 - visa Knowledge-filer som text i en popup
 - öppna avancerade GPT Byggaren Chat-distributioner i read-only-läge
@@ -98,7 +98,7 @@ PWA:n har dessutom egen importlogik för både redigerbara GPT Paketeraren-distr
 
 - projekt-ZIP
 - Chat ZIP
-- ChatGPT Plugin ZIP
+- OpenAI Plugin ZIP
 - Claude ZIP
 - OpenCode ZIP
 - `SHA256SUMS.txt`

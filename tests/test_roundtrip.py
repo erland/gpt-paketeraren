@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import hashlib, subprocess, tempfile
+import hashlib, json, subprocess, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,9 +18,13 @@ def main() -> None:
         t = Path(td)
         project = t / "project"
         (project / "knowledge" / "sub").mkdir(parents=True)
+        description = 'Testar paketering: "citat" + Knowledge utan omskrivning.'
         (project / "gpt.yaml").write_text(
-            'schema_version: 1\n\ngpt:\n  id: "test-gpt"\n  name: "Test GPT: ÅÄÖ"\n'
-            '  description: "Testar paketering: instruktion + Knowledge utan omskrivning."\n', encoding="utf-8")
+            'schema_version: 1\n\ngpt:\n'
+            + '  id: "test-gpt"\n'
+            + '  name: "Test GPT: ÅÄÖ"\n'
+            + f'  description: {json.dumps(description, ensure_ascii=False)}\n',
+            encoding="utf-8")
         original = "# Roll\n\nGör exakt det användaren ber om.\n\n## Knowledge\n\nBehåll detta.\n\n## OpenCode runtime\n\nBehåll även detta.\n"
         (project / "instructions.md").write_text(original, encoding="utf-8")
         (project / "knowledge" / "a.md").write_text("Alpha\n", encoding="utf-8")
@@ -36,7 +40,7 @@ def main() -> None:
             assert (imported / "instructions.md").read_text(encoding="utf-8") == original
             y = (imported / "gpt.yaml").read_text(encoding="utf-8")
             assert 'name: "Test GPT: ÅÄÖ"' in y
-            assert 'description: "Testar paketering: instruktion + Knowledge utan omskrivning."' in y
+            assert f"description: {json.dumps(description, ensure_ascii=False)}" in y
             assert (imported / "knowledge" / "a.md").read_text() == "Alpha\n"
             assert (imported / "knowledge" / "sub" / "b.txt").read_text() == "Beta\n"
     print("PASS: chat, plugin, claude, opencode round-trip + deterministic build")

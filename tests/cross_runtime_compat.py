@@ -31,7 +31,7 @@ def write_project(project: Path) -> None:
     (project / "knowledge" / "sub").mkdir(parents=True)
     (project / "gpt.yaml").write_text(
         'schema_version: 1\n\ngpt:\n'
-        '  id: "test-gpt"\n'
+        '  id: "test-gpt-aao"\n'
         f'  name: "{NAME}"\n'
         f'  description: {json.dumps(DESCRIPTION, ensure_ascii=False)}\n',
         encoding="utf-8",
@@ -87,7 +87,7 @@ def verify(workdir: Path) -> None:
             for relative, content in KNOWLEDGE.items():
                 assert (imported / "knowledge" / relative).read_text(encoding="utf-8") == content
 
-    python_plugin = workdir / "python" / "test-gpt-plugin-0.0.0-compat.zip"
+    python_plugin = workdir / "python" / "test-gpt-aao-plugin-0.0.0-compat.zip"
     web_plugin = workdir / "web" / "plugin.zip"
     with zipfile.ZipFile(python_plugin) as zf:
         python_contract = json.loads(zf.read("runtime-contract.json"))

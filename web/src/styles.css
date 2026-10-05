@@ -130,3 +130,14 @@ input[readonly], textarea[readonly] { background: #f8fafc; color: #334155; }
 
 .modal .highlighted-code { white-space: pre; overflow-wrap: normal; }
 .modal .text-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+
+.field-label { display: block; font-weight: 700; margin-bottom: 8px; }
+.instruction-preview { border: 1px solid #cbd5e1; border-radius: 10px; background: white; max-height: 520px; overflow: auto; }
+.instruction-preview .preview-body { min-height: 220px; }
+.instruction-preview .markdown-preview { padding: 18px 20px 24px; }
+.instruction-preview .highlighted-code, .instruction-preview .text-preview pre { padding: 16px; }
+@media (max-width: 700px) {
+  .instruction-preview { max-height: 65vh; }
+  .instruction-preview .markdown-preview { padding: 14px; }
+}

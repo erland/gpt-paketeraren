@@ -131,7 +131,29 @@ export default function App() {
       <section className="card form-grid" aria-label="GPT-projekt">
         <label><span>Namn på GPT</span><input value={name} readOnly={readOnly} onChange={(event) => setName(event.target.value)} placeholder="Produktinformatören" /></label>
         <label><span>Kort beskrivning</span><input value={description} readOnly={readOnly} onChange={(event) => setDescription(event.target.value)} placeholder="Visar information om en produkt." /></label>
-        <label className="full"><span>GPT-instruktion</span><textarea rows={14} value={instructions} readOnly={readOnly} onChange={(event) => setInstructions(event.target.value)} placeholder="Skriv eller klistra in instruktionen här." /><small>{readOnly ? `Visas från ${packageMetadata?.instructionPath ?? "identifierad instruction-fil"}.` : "Instruktionen skrivs inte om eller förbättras av PWA:n."}</small></label>
+        {readOnly ? (
+          <div className="full instruction-readonly">
+            <span className="field-label">GPT-instruktion</span>
+            <div className="instruction-preview">
+              <FilePreview
+                path={packageMetadata?.instructionPath ?? "instructions.md"}
+                content={instructions}
+              />
+            </div>
+            <small>Visas från {packageMetadata?.instructionPath ?? "identifierad instruction-fil"}.</small>
+          </div>
+        ) : (
+          <label className="full">
+            <span>GPT-instruktion</span>
+            <textarea
+              rows={14}
+              value={instructions}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder="Skriv eller klistra in instruktionen här."
+            />
+            <small>Instruktionen skrivs inte om eller förbättras av PWA:n.</small>
+          </label>
+        )}
 
         {!readOnly && (
           <div className="full">

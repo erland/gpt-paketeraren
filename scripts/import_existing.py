@@ -39,6 +39,15 @@ def read_readme_metadata(path: Path, suffix: str = "") -> tuple[str | None, str 
             break
     return name, description
 
+def decode_frontmatter_scalar(value: str) -> str:
+    value = value.strip()
+    if value.startswith('"'):
+        try:
+            return json.loads(value)
+        except Exception:
+            return value.strip('"')
+    return value.strip("'")
+
 def strip_skill_frontmatter(text: str) -> tuple[dict, str]:
     meta = {}
     if text.startswith("---\n"):
@@ -48,7 +57,7 @@ def strip_skill_frontmatter(text: str) -> tuple[dict, str]:
             for line in raw.splitlines():
                 if ":" in line:
                     k, v = line.split(":", 1)
-                    meta[k.strip()] = v.strip().strip('"\'')
+                    meta[k.strip()] = decode_frontmatter_scalar(v)
             text = text[end + 5 :]
     return meta, strip_runtime_adapter(text)
 

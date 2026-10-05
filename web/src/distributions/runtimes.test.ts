@@ -6,7 +6,7 @@ import { buildPluginZip } from "./plugin";
 
 const project = {
   name: "Produktinformatören",
-  description: "Visar produktinformation.",
+  description: 'Visar produktinformation: "lokalt".',
   instructions: "Behåll instruktionen exakt.\n",
   knowledge: [{ path: "manual.md", content: new Blob(["manual"]), size: 6 }]
 };
@@ -15,7 +15,14 @@ describe("runtime distributions", () => {
   it("builds Plugin with skill and references", async () => {
     const zip = await JSZip.loadAsync(await (await buildPluginZip(project)).arrayBuffer());
     expect(zip.file("plugin.json")).not.toBeNull();
+    expect(zip.file("runtime-contract.json")).not.toBeNull();
     expect(zip.file("skills/produktinformatoren/SKILL.md")).not.toBeNull();
+    const contract = JSON.parse(await zip.file("runtime-contract.json")!.async("string"));
+    expect(contract.runtime_id).toBe("openai_plugin");
+    expect(contract.adapter.skills_first).toBe(true);
+    expect(contract.adapter.skills).toEqual(["produktinformatoren"]);
+    expect(contract.adapter.script_resources.packaged).toEqual([]);
+    expect(contract.adapter.mcp_generated).toBe(false);
     expect(await zip.file("skills/produktinformatoren/references/manual.md")!.async("string")).toBe("manual");
   });
 

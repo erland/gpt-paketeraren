@@ -11,7 +11,7 @@ const root = process.env.GPT_PACKAGER_COMPAT_DIR;
 const compatDescribe = root ? describe : describe.skip;
 
 const name = "Test GPT: ÅÄÖ";
-const description = "Testar kompatibilitet mellan Python och PWA.";
+const description = 'Testar kompatibilitet: "Python + PWA".';
 const instructions = "# Roll\n\nBehåll exakt.\n\n## Knowledge\n\nAnvänd bifogat material.\n";
 const knowledge = [
   { path: "a.md", content: new Blob(["Alpha\n"]), size: 6 },

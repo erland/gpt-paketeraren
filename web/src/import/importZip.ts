@@ -1,7 +1,12 @@
 import JSZip from "jszip";
 import { GptProject, KnowledgeFile } from "../domain/project";
 import { PackageFile, PackageMetadata } from "../domain/package";
-import { detectPackageMetadata, isAdvancedPackage, readPackageFiles } from "./packageViewer";
+import {
+  detectPackageMetadata,
+  isAdvancedPackage,
+  normalizePackageRoot,
+  readPackageFiles
+} from "./packageViewer";
 
 const ADAPTER_BEGIN = "<!-- GPT-PACKAGER:RUNTIME-ADAPTER:BEGIN -->";
 const ADAPTER_END = "<!-- GPT-PACKAGER:RUNTIME-ADAPTER:END -->";
@@ -26,11 +31,12 @@ export function assertZipInputSize(size: number, maxBytes = MAX_ZIP_INPUT_BYTES)
 export async function importRuntimeZip(file: Blob): Promise<ImportResult> {
   assertZipInputSize(file.size);
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
-  const names = Object.keys(zip.files);
-  const files = await readPackageFiles(zip);
+  const files = normalizePackageRoot(await readPackageFiles(zip));
+  const names = files.map((item) => item.path);
+  const has = (path: string) => names.includes(path);
 
-  if (isAdvancedPackage(zip)) {
-    const metadata = await detectPackageMetadata(zip, files);
+  if (isAdvancedPackage(files)) {
+    const metadata = detectPackageMetadata(files);
     return {
       runtime: "package",
       mode: "readonly",
@@ -39,23 +45,23 @@ export async function importRuntimeZip(file: Blob): Promise<ImportResult> {
     };
   }
 
-  if (zip.file("assistant/instructions.md") && zip.file("START-HERE.md")) {
+  if (has("assistant/instructions.md") && has("START-HERE.md")) {
     return importChat(files);
   }
 
-  if (zip.file("plugin.json") && names.some((name) => /^skills\/[^/]+\/SKILL\.md$/.test(name))) {
+  if (has("plugin.json") && names.some((name) => /^skills\/[^/]+\/SKILL\.md$/.test(name))) {
     return importPlugin(files);
   }
 
-  if (zip.file("instructions.md") && zip.file("README.md")) {
+  if (has("instructions.md") && has("README.md")) {
     return importClaude(files);
   }
 
-  if (zip.file("AGENTS.md") && zip.file("README.md")) {
+  if (has("AGENTS.md") && has("README.md")) {
     return importOpenCode(files);
   }
 
-  throw new Error("ZIP-filen känns inte igen som en stödd GPT Paketeraren-distribution.");
+  throw new Error("ZIP-filen känns inte igen som en stödd GPT Paketeraren- eller avancerad GPT-distribution.");
 }
 
 async function importChat(files: PackageFile[]): Promise<ImportResult> {

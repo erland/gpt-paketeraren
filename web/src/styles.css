@@ -127,3 +127,6 @@ input[readonly], textarea[readonly] { background: #f8fafc; color: #334155; }
   .markdown-preview h1 { font-size: 1.5rem; }
   .markdown-preview h2 { font-size: 1.25rem; }
 }
+
+.modal .highlighted-code { white-space: pre; overflow-wrap: normal; }
+.modal .text-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; }
